@@ -1,8 +1,8 @@
 from piazza_api import Piazza
 from piazza_object.piazza_object import PiazzaObject
-import threading
 import numpy as np
 from discord import Client, Embed, TextChannel
+from discord.ext import tasks
 from datetime import datetime
 import html
 
@@ -11,7 +11,6 @@ sent_ids = []
 token = 'token'
 channel_id = 0
 client = Client()
-timer = None
 
 @client.event
 async def on_message(message):
@@ -20,22 +19,19 @@ async def on_message(message):
         await message.channel.send(f'{message.author.mention} , pong')
 
     if message.content == '!piazzacheck':
-        if timer:
-            timer.stop()
-        await send_new_posts()
-        set_interval(send_new_posts, 1800)
+        new_posts_loop.restart()
 
     if message.content == '!topbruhmoment':
         if message.channel.id == channel_id:
             await message.channel.send(embed=Embed(title="here", url="https://www.youtube.com/watch?v=dQw4w9WgXcQ"))
 
-def set_interval(func, sec):
-    async def func_wrapper():
-        set_interval(func, sec)
-        await func()
-    timer = threading.Timer(sec, func_wrapper)
-    timer.start()
-    return timer
+@client.event
+async def on_ready():
+    new_posts_loop.start()
+
+@tasks.loop(minutes=30)
+async def new_posts_loop():
+    await send_new_posts()
 
 async def send_new_posts():
     load_sent_ids()
@@ -77,7 +73,6 @@ async def send_new_posts():
 
     save_sent_ids()
 
-
 def load_sent_ids():
     global sent_ids
     sent_ids = np.loadtxt('sent_ids.txt', dtype=str).tolist()
@@ -106,6 +101,3 @@ def format(text):
     return html.unescape(cleantext)
 
 client.run(token)
-
-
-set_interval(send_new_posts, 1800)
